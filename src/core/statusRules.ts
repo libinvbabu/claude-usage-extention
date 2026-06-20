@@ -1,13 +1,16 @@
-// Recommendation engine. Two responsibilities:
-//   1. recommendForInsight()      — a short per-bucket line.
-//   2. selectTopRecommendation()  — the single most important headline.
-//   3. buildTips()                — optional Claude Code usage tips.
+// Recommendation engine. Three responsibilities:
+//   1. recommendForInsight()      — a short per-bucket line (screen-reader aid).
+//   2. selectTopRecommendation()  — the single headline + bottleneck + guidance mode.
+//   3. taskGuidanceFor()          — state-based, actionable task guidance.
 //
-// No exact "messages left" is ever produced — only percentage-based guidance.
+// Copy is deliberately careful: it never claims exact "messages" or "tokens"
+// left, and never overstates certainty — only percentage-based pacing guidance.
 
 import type {
+  BottleneckType,
   ClaudeLimitType,
   ClaudePaceInsight,
+  GuidanceMode,
   PaceStatus,
   UserPreferences,
 } from "../types/usage";
@@ -16,10 +19,25 @@ export type TopRecommendation = {
   status: PaceStatus;
   title: string;
   body: string;
+  /** Which limit is most likely to constrain the next heavy task. */
+  bottleneck: BottleneckType;
+  /** Human label for the bottleneck line, e.g. "None", "Current session". */
+  bottleneckLabel: string;
+  /** Drives the task-guidance card. */
+  guidanceMode: GuidanceMode;
 };
 
+export type TaskGuidanceItem = { heading: string; body: string };
+export type TaskGuidance = { mode: GuidanceMode; items: TaskGuidanceItem[] };
+
 const HEALTHY: PaceStatus[] = ["under_pace", "on_track"];
-const ABOVE: PaceStatus[] = ["slightly_above", "at_risk"];
+
+const BOTTLENECK_LABELS: Record<BottleneckType, string> = {
+  none: "None",
+  current_session: "Current session",
+  weekly_all_models: "Weekly all-model limit",
+  weekly_sonnet: "Sonnet weekly limit",
+};
 
 function byType(
   insights: ClaudePaceInsight[],
@@ -29,7 +47,24 @@ function byType(
   return map;
 }
 
-/** A concise recommendation for a single bucket card. */
+function isHealthy(insight: ClaudePaceInsight | undefined): boolean {
+  return !insight || HEALTHY.includes(insight.status);
+}
+
+/** Of two weekly buckets in the same trouble band, the tighter (lower remaining). */
+function tighterWeekly(
+  all: ClaudePaceInsight | undefined,
+  sonnet: ClaudePaceInsight | undefined,
+  band: PaceStatus[],
+): ClaudePaceInsight | undefined {
+  const candidates = [all, sonnet].filter(
+    (i): i is ClaudePaceInsight => !!i && band.includes(i.status),
+  );
+  if (candidates.length === 0) return undefined;
+  return candidates.sort((a, b) => a.remainingPct - b.remainingPct)[0];
+}
+
+/** A concise recommendation for a single bucket (used as a screen-reader label). */
 export function recommendForInsight(
   insight: ClaudePaceInsight,
   _prefs: UserPreferences,
@@ -39,7 +74,7 @@ export function recommendForInsight(
 
   switch (insight.status) {
     case "exhausted":
-      if (isSession) return "Session exhausted — wait for the 5-hour reset.";
+      if (isSession) return "Session used up — wait for the 5-hour reset.";
       if (isSonnet) return "Sonnet weekly limit reached — avoid Sonnet until reset.";
       return "Weekly limit reached — wait for the weekly reset.";
     case "at_risk":
@@ -60,139 +95,175 @@ export function recommendForInsight(
   }
 }
 
-/** Pick the single most important headline across all buckets. */
-export function selectTopRecommendation(
-  insights: ClaudePaceInsight[],
+function rec(
+  status: PaceStatus,
+  title: string,
+  body: string,
+  bottleneck: BottleneckType,
+  guidanceMode: GuidanceMode,
 ): TopRecommendation {
-  if (insights.length === 0) {
-    return {
-      status: "unknown",
-      title: "No usage data",
-      body: "Usage data not found on this page.",
-    };
-  }
-
-  const m = byType(insights);
-  const session = m.current_session;
-  const weekly = m.weekly_all_models;
-  const sonnet = m.weekly_sonnet;
-
-  // 1. Session exhausted.
-  if (session?.status === "exhausted") {
-    return {
-      status: "exhausted",
-      title: "Session exhausted",
-      body: "Current session is exhausted. Wait until reset before starting heavy Claude Code work.",
-    };
-  }
-  // 2. Weekly all-model exhausted.
-  if (weekly?.status === "exhausted") {
-    return {
-      status: "exhausted",
-      title: "Weekly limit exhausted",
-      body: "Weekly all-model limit is exhausted. Wait for the weekly reset or use usage credits if enabled.",
-    };
-  }
-  // 3. Sonnet exhausted.
-  if (sonnet?.status === "exhausted") {
-    return {
-      status: "exhausted",
-      title: "Sonnet limit exhausted",
-      body: "Sonnet weekly limit is exhausted. Avoid Sonnet-heavy work until reset.",
-    };
-  }
-  // 4. Session at risk.
-  if (session?.status === "at_risk") {
-    return {
-      status: "at_risk",
-      title: "Slow down",
-      body: "Slow down. Avoid long agentic Claude Code runs until the session resets.",
-    };
-  }
-  // 5. Weekly at risk.
-  if (weekly?.status === "at_risk" || sonnet?.status === "at_risk") {
-    return {
-      status: "at_risk",
-      title: "Weekly is the bottleneck",
-      body: "Session has room, but weekly quota is the bottleneck. Use Claude for high-value tasks only.",
-    };
-  }
-  // 6. Session under pace and weekly healthy.
-  if (
-    session?.status === "under_pace" &&
-    (!weekly || HEALTHY.includes(weekly.status))
-  ) {
-    return {
-      status: "under_pace",
-      title: "Good time for heavy work",
-      body: "Good time for heavy work. You have meaningful session and weekly headroom.",
-    };
-  }
-  // 7. Session on track.
-  if (session?.status === "on_track") {
-    return {
-      status: "on_track",
-      title: "On track",
-      body: "Normal usage is fine. Keep an eye on long contexts.",
-    };
-  }
-  // 8. Fallback.
-  return {
-    status: session?.status ?? weekly?.status ?? "unknown",
-    title: "Usage data found",
-    body: "Usage data found. Continue normally.",
-  };
+  return { status, title, body, bottleneck, bottleneckLabel: BOTTLENECK_LABELS[bottleneck], guidanceMode };
 }
 
 /**
- * Optional, actionable Claude Code tips based on the current picture.
- * Returns an empty list when tips are disabled or nothing notable applies.
+ * Pick the single most important headline across all buckets, plus the current
+ * bottleneck and the guidance mode. Order = most-constraining first.
  */
-export function buildTips(
+export function selectTopRecommendation(
   insights: ClaudePaceInsight[],
-  prefs: UserPreferences,
-): string[] {
-  if (!prefs.showClaudeCodeTips) return [];
+): TopRecommendation {
+  const present = insights.filter((i) => i.status !== "unknown");
+  if (present.length === 0) {
+    return rec(
+      "unknown",
+      "Usage data unavailable",
+      "Usage values couldn't be read from this page. Open Claude's Usage settings, or click Re-read once it finishes loading.",
+      "none",
+      "unavailable",
+    );
+  }
 
   const m = byType(insights);
   const session = m.current_session;
   const weekly = m.weekly_all_models;
   const sonnet = m.weekly_sonnet;
-  const tips: string[] = [];
 
-  const burnHigh =
-    session?.status === "at_risk" ||
-    (session?.projectedEndPct !== undefined && session.projectedEndPct > 100);
-
-  if (burnHigh) {
-    tips.push("Burn rate is high — run /clear before the next task to drop old context.");
-  } else if (session?.status === "slightly_above") {
-    tips.push("Use shorter prompts and avoid carrying old context (/compact can help).");
+  // 1. Exhausted — most immediate first (session, then weekly all-models, then Sonnet).
+  if (session?.status === "exhausted") {
+    return rec(
+      "exhausted",
+      "Wait until reset",
+      "This 5-hour session is used up. Wait for the session to reset before starting heavy Claude Code work.",
+      "current_session",
+      "at_risk",
+    );
   }
-
-  if (weekly && ABOVE.includes(weekly.status)) {
-    tips.push("Save Claude Code for high-value tasks this week.");
+  if (weekly?.status === "exhausted") {
+    return rec(
+      "exhausted",
+      "Wait until reset",
+      "Your weekly all-model limit is used up. Wait for the weekly reset before starting heavy work.",
+      "weekly_all_models",
+      "weekly_bottleneck",
+    );
   }
-
-  const sonnetConstrained =
-    sonnet &&
-    (ABOVE.includes(sonnet.status) ||
-      sonnet.status === "exhausted" ||
-      (sonnet.remainingPct < (weekly?.remainingPct ?? 100) - 10 && sonnet.usedPct > 0));
-  if (sonnetConstrained) {
-    tips.push("Use Sonnet carefully; it may be the limiting bucket this week.");
-  }
-
-  // Encourage good hygiene when there is clear headroom.
-  if (
-    tips.length === 0 &&
-    session?.status === "under_pace" &&
-    (!weekly || HEALTHY.includes(weekly.status))
-  ) {
-    tips.push(
-      "Good window for a larger task. Start fresh with /clear so old context doesn't eat quota.",
+  if (sonnet?.status === "exhausted") {
+    return rec(
+      "exhausted",
+      "Wait until reset",
+      "Your Sonnet weekly limit is used up. Switch models or wait for the weekly reset.",
+      "weekly_sonnet",
+      "weekly_bottleneck",
     );
   }
 
-  return tips;
+  // 2. Session is the pressing limit (at risk).
+  if (session?.status === "at_risk") {
+    return rec(
+      "at_risk",
+      "Slow down for this session",
+      "You're well ahead of pace for this 5-hour session. Long agentic runs may use it up before it resets.",
+      "current_session",
+      "at_risk",
+    );
+  }
+
+  // 3. A weekly limit is at risk while the session still has room.
+  const weeklyAtRisk = tighterWeekly(weekly, sonnet, ["at_risk"]);
+  if (weeklyAtRisk) {
+    return rec(
+      "at_risk",
+      "Weekly limit is the bottleneck",
+      "Your session still has room, but a weekly limit is filling faster than time is passing. It's the limit most likely to constrain heavy work.",
+      weeklyAtRisk.type,
+      "weekly_bottleneck",
+    );
+  }
+
+  // 4. Session a little ahead of pace.
+  if (session?.status === "slightly_above") {
+    return rec(
+      "slightly_above",
+      "Slow down for this session",
+      "You're a little ahead of pace for this 5-hour session. Prefer smaller prompts and trim old context before a big task.",
+      "current_session",
+      "slightly_above",
+    );
+  }
+
+  // 5. A weekly limit is a little ahead of pace.
+  const weeklyAbove = tighterWeekly(weekly, sonnet, ["slightly_above"]);
+  if (weeklyAbove) {
+    return rec(
+      "slightly_above",
+      "Weekly limit is the bottleneck",
+      "Your session has room, but weekly usage is a bit ahead of pace. The weekly limit is the more likely constraint this week.",
+      weeklyAbove.type,
+      "weekly_bottleneck",
+    );
+  }
+
+  // 6. Clear headroom: session under pace and everything else healthy.
+  const sessionUnder = session
+    ? session.status === "under_pace"
+    : weekly?.status === "under_pace";
+  if (sessionUnder && isHealthy(weekly) && isHealthy(sonnet)) {
+    const bothUnder =
+      (session?.status === "under_pace" || !session) &&
+      (weekly?.status === "under_pace" || !weekly);
+    const body = bothUnder
+      ? "You're under pace for both session and weekly limits. Large Claude Code tasks can still drain usage quickly, especially with long context."
+      : "You're under pace for this session and within pace for the week. Large Claude Code tasks can still drain usage quickly, especially with long context.";
+    return rec("under_pace", "Good window for heavy work", body, "none", "under_pace");
+  }
+
+  // 7. On track / mixed-but-healthy fallback.
+  return rec(
+    session?.status ?? weekly?.status ?? "on_track",
+    "Normal usage is fine",
+    "Usage is tracking roughly with the time elapsed. Normal coding and review work is fine — keep an eye on long contexts.",
+    "none",
+    "on_track",
+  );
+}
+
+// State-based task guidance. Copy is intentionally action-oriented and avoids
+// any claim of exact remaining messages or tokens.
+const GUIDANCE: Record<GuidanceMode, TaskGuidanceItem[]> = {
+  under_pace: [
+    { heading: "Good for", body: "Small questions · Debugging · One larger Claude Code task" },
+    { heading: "Before a large task", body: "Run /clear, then give a focused task brief." },
+  ],
+  on_track: [
+    { heading: "Good for", body: "Normal coding and review tasks" },
+    {
+      heading: "Before a large task",
+      body: "Start fresh if the current conversation has lots of old context.",
+    },
+  ],
+  slightly_above: [
+    { heading: "Use carefully", body: "Prefer smaller prompts and short debugging loops." },
+    { heading: "Before continuing", body: "Run /compact or /clear to reduce old context." },
+  ],
+  at_risk: [
+    { heading: "Avoid for now", body: "Long agentic Claude Code runs and large refactors." },
+    {
+      heading: "Better move",
+      body: "Wait for reset, or use Claude only for high-value short tasks.",
+    },
+  ],
+  weekly_bottleneck: [
+    { heading: "Save usage for", body: "High-value coding tasks and important reviews." },
+    { heading: "Avoid", body: "Long exploratory agent runs until the weekly reset." },
+  ],
+  unavailable: [],
+};
+
+/**
+ * Build the task-guidance card content for a guidance mode, or null when there
+ * is nothing useful to show (the "unavailable" state).
+ */
+export function taskGuidanceFor(mode: GuidanceMode): TaskGuidance | null {
+  const items = GUIDANCE[mode];
+  return items.length ? { mode, items } : null;
 }

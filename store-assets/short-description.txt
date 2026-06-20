@@ -1,0 +1,1 @@
+Inline pacing helper for Claude usage — session headroom, weekly pace, and Claude Code task guidance.

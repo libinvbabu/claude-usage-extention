@@ -11,6 +11,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   workingHoursEnd: "18:00",
   showClaudeCodeTips: true,
   compactMode: false,
+  showParserDebug: false,
 };
 
 /** Merge stored prefs over defaults, sanitising bad values. */
@@ -29,6 +30,7 @@ export function normalizePreferences(input: Partial<UserPreferences> | undefined
       : DEFAULT_PREFERENCES.workingHoursEnd,
     showClaudeCodeTips: Boolean(p.showClaudeCodeTips),
     compactMode: Boolean(p.compactMode),
+    showParserDebug: Boolean(p.showParserDebug),
   };
 }
 

@@ -36,6 +36,33 @@ export function formatRatePerDay(pctPerDay: number | undefined): string {
   return `~${formatPct(pctPerDay)} / day`;
 }
 
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/**
+ * Local clock time for an absolute reset, in Claude's 12-hour style ("5:30 PM").
+ * If the reset falls on a different local calendar day than `now` (e.g. a session
+ * that crosses midnight), the weekday is prepended ("Tue 2:30 AM") so it stays
+ * unambiguous — matching the weekly cards' "Resets Wed 3:30 AM" format.
+ */
+export function formatClockTime(
+  epochMs: number | undefined,
+  now: number = Date.now(),
+): string {
+  if (epochMs === undefined || !Number.isFinite(epochMs)) return "";
+  const d = new Date(epochMs);
+  let hours = d.getHours();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  const time = `${hours}:${d.getMinutes().toString().padStart(2, "0")} ${ampm}`;
+
+  const n = new Date(now);
+  const sameDay =
+    d.getFullYear() === n.getFullYear() &&
+    d.getMonth() === n.getMonth() &&
+    d.getDate() === n.getDate();
+  return sameDay ? time : `${WEEKDAYS[d.getDay()]} ${time}`;
+}
+
 /**
  * Signed pace gap as plain language.
  *  gap = used - expected.  Negative = under pace (good), positive = over.
@@ -75,4 +102,11 @@ export function formatAgo(fromMs: number, now: number = Date.now()): string {
   const hr = Math.round(min / 60);
   if (hr < 24) return `${hr}h ago`;
   return `${Math.round(hr / 24)}d ago`;
+}
+
+/** "just now" within the first few seconds, otherwise the relative form. */
+export function formatLastRead(fromMs: number | undefined, now: number = Date.now()): string {
+  if (fromMs === undefined || !Number.isFinite(fromMs)) return "—";
+  if (now - fromMs < 10_000) return "just now";
+  return formatAgo(fromMs, now);
 }

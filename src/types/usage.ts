@@ -40,6 +40,25 @@ export type PaceStatus =
   | "unknown";
 
 /**
+ * Which limit is most likely to constrain the next heavy task. "none" means no
+ * limit is currently pressing (everything has comfortable headroom).
+ */
+export type BottleneckType = ClaudeLimitType | "none";
+
+/**
+ * Drives the task-guidance card. Distinct from PaceStatus because guidance also
+ * accounts for which limit is the bottleneck (e.g. a healthy session but a tight
+ * week → "weekly_bottleneck") and for the unreadable case.
+ */
+export type GuidanceMode =
+  | "under_pace"
+  | "on_track"
+  | "slightly_above"
+  | "at_risk"
+  | "weekly_bottleneck"
+  | "unavailable";
+
+/**
  * A computed pacing insight for one bucket: combines the raw snapshot with
  * time-window math, projections and a per-bucket recommendation.
  */
@@ -61,7 +80,10 @@ export type ClaudePaceInsight = {
   elapsedPct?: number;
   /** Projected usage at the end of the window if the current burn rate holds. */
   projectedEndPct?: number;
-  /** Projected unused allowance at reset (0–100). */
+  /**
+   * Estimated unused allowance at reset if the current burn rate holds (0–100).
+   * Surfaced in the UI as "Unused if pace continues" — an estimate, not a promise.
+   */
   projectedUnusedPct?: number;
   /** Safe spend rate (% per hour) to exactly exhaust by reset — session buckets. */
   safeRatePctPerHour?: number;
@@ -82,6 +104,8 @@ export type UserPreferences = {
   showClaudeCodeTips: boolean;
   /** Render a denser panel. */
   compactMode: boolean;
+  /** Show the parser debug panel (internal beta aid; defaults off). */
+  showParserDebug: boolean;
 };
 
 /** One stored history entry: a batch of snapshots captured together. */

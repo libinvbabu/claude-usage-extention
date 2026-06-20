@@ -115,7 +115,7 @@ export function OptionsPage() {
                 : name === "mon-sat"
                   ? "Mon–Sat"
                   : name === "all"
-                    ? "All days"
+                    ? "Every day"
                     : "Custom"}
             </button>
           ))}
@@ -192,6 +192,32 @@ export function OptionsPage() {
             <span className="slider" />
           </label>
         </div>
+        <div className="opt-row">
+          <div>
+            <div className="opt-row-label">Show parser debug details</div>
+            <div className="opt-row-desc">
+              Show what the panel read from the page. Helpful for spotting Claude UI
+              changes; off by default.
+            </div>
+          </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={prefs.showParserDebug}
+              onChange={(e) => update({ showParserDebug: e.target.checked })}
+            />
+            <span className="slider" />
+          </label>
+        </div>
+      </section>
+
+      <section className="opt-card">
+        <h2>Privacy</h2>
+        <p className="opt-hint">
+          This extension reads visible usage text from Claude's Usage page and stores
+          compact snapshots locally. It does not send data anywhere — there is no
+          backend, no analytics, and no external network calls.
+        </p>
       </section>
 
       <section className="opt-card">

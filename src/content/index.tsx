@@ -2,9 +2,14 @@
 // the visible usage text, computes pacing insights, and keeps an injected
 // dashboard in sync across SPA navigation and DOM mutations.
 
-import type { UserPreferences } from "../types/usage";
+import type {
+  ClaudeLimitSnapshot,
+  ClaudeLimitType,
+  UserPreferences,
+} from "../types/usage";
 import { computeInsights } from "../core/paceEngine";
-import { buildTips, selectTopRecommendation } from "../core/statusRules";
+import { selectTopRecommendation, taskGuidanceFor } from "../core/statusRules";
+import { formatPct } from "../core/formatters";
 import { parseUsagePage } from "./parseClaudeUsage";
 import { loadPreferences, onPreferencesChanged } from "../storage/preferences";
 import { recordSnapshots } from "../storage/localHistory";
@@ -89,6 +94,24 @@ function openOptions(): void {
   }
 }
 
+// --- Parser debug ----------------------------------------------------------
+
+const DEBUG_BUCKETS: Array<[ClaudeLimitType, string]> = [
+  ["current_session", "Current session"],
+  ["weekly_all_models", "Weekly all models"],
+  ["weekly_sonnet", "Weekly Sonnet"],
+];
+
+/** One line per expected bucket describing what the parser found (beta aid). */
+function buildDebugLines(snapshots: ClaudeLimitSnapshot[]): string[] {
+  return DEBUG_BUCKETS.map(([type, label]) => {
+    const s = snapshots.find((x) => x.type === type);
+    return s
+      ? `${label}: found "${formatPct(s.usedPct)} used", "${s.resetLabel}"`
+      : `${label}: not found`;
+  });
+}
+
 // --- Core refresh ----------------------------------------------------------
 
 async function refresh(): Promise<void> {
@@ -103,6 +126,10 @@ async function refresh(): Promise<void> {
   const container = findUsageContainer();
   const parseRoot = container ?? document.body;
   const snapshots = parseUsagePage(parseRoot);
+  const debugLines = buildDebugLines(snapshots);
+  const reread = () => {
+    void refresh();
+  };
 
   if (snapshots.length === 0) {
     // Distinguish "the usage modal hasn't mounted yet" from "it's open but
@@ -116,9 +143,12 @@ async function refresh(): Promise<void> {
         {
           insights: [],
           recommendation: selectTopRecommendation([]),
-          tips: [],
+          guidance: null,
           compact: prefs.compactMode,
+          showDebug: prefs.showParserDebug,
+          debugLines,
           onOpenOptions: openOptions,
+          onReread: reread,
         },
         container,
       );
@@ -132,16 +162,21 @@ async function refresh(): Promise<void> {
 
   const insights = computeInsights(snapshots, prefs);
   const recommendation = selectTopRecommendation(insights);
-  const tips = buildTips(insights, prefs);
+  const guidance = prefs.showClaudeCodeTips
+    ? taskGuidanceFor(recommendation.guidanceMode)
+    : null;
 
   renderPanel(
     {
       insights,
       recommendation,
-      tips,
+      guidance,
       compact: prefs.compactMode,
-      lastObservedAt: Date.now(),
+      showDebug: prefs.showParserDebug,
+      debugLines,
+      lastReadAt: Date.now(),
       onOpenOptions: openOptions,
+      onReread: reread,
     },
     container,
   );
