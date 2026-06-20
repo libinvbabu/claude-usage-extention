@@ -105,9 +105,13 @@ async function refresh(): Promise<void> {
   const snapshots = parseUsagePage(parseRoot);
 
   if (snapshots.length === 0) {
-    // Only surface a "not found" card when the URL clearly says usage; on other
-    // Claude pages we stay invisible.
-    if (isUsageUrl()) {
+    // Distinguish "the usage modal hasn't mounted yet" from "it's open but
+    // unparseable". Only show the not-found card in the latter case; otherwise
+    // stay invisible and wait for the MutationObserver to fire when it mounts.
+    // (Injecting prematurely would place the host at <body>, hidden behind the
+    // modal overlay.)
+    const usagePresent = container !== null || pageHasUsageText();
+    if (isUsageUrl() && usagePresent) {
       renderPanel(
         {
           insights: [],
@@ -210,6 +214,11 @@ function start(): void {
   }, PERIODIC_REFRESH_MS);
 
   void refresh();
+  // The usage modal usually mounts a beat after the SPA settles. The observer
+  // catches that, but these nudges cover early races and animated mounts.
+  for (const delay of [400, 1000, 2500]) {
+    setTimeout(() => void refresh(), delay);
+  }
 }
 
 if (document.readyState === "loading") {

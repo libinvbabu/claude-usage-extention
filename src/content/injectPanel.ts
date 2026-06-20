@@ -38,10 +38,26 @@ function buildHost(anchor: HTMLElement | null): void {
  * Ensure a healthy host+root exists. Recreates it if the page (e.g. an SPA
  * re-render) removed our host. Returns true when it (re)created the root.
  */
+/**
+ * Move an existing host so it sits immediately after `anchor`. The usage modal
+ * mounts asynchronously, so the host is often first created at the page body
+ * (before the modal exists) and must be relocated into the modal once it
+ * appears — otherwise it stays hidden behind the modal overlay.
+ */
+function relocateHost(host: HTMLElement, anchor: HTMLElement | null): void {
+  if (!anchor || !anchor.parentNode) return;
+  if (anchor === host || host.contains(anchor)) return; // would be an invalid move
+  if (anchor.nextElementSibling === host) return; // already correctly placed
+  anchor.insertAdjacentElement("afterend", host);
+}
+
 function ensureHost(anchor: HTMLElement | null): void {
   const existing = document.getElementById(PANEL_HOST_ID);
   const healthy = existing && existing.shadowRoot && root && container;
-  if (healthy) return;
+  if (healthy) {
+    relocateHost(existing, anchor);
+    return;
+  }
 
   if (root) {
     try {
