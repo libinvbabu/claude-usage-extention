@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Claude Usage Pace",
+  "description": "Inline pacing helper for Claude usage — shows session budget, weekly pace, projected unused capacity, and usage suggestions.",
+  "version": "0.1.0",
+  "permissions": ["storage"],
+  "host_permissions": ["https://claude.ai/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["options.html"],
+      "matches": ["https://claude.ai/*"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}
