@@ -23,7 +23,8 @@ It answers questions Claude's raw bars don't:
 ## Features
 
 - **Top recommendation** with careful, non-overconfident copy and a **current
-  bottleneck** line (None / Current session / Weekly all-model / Sonnet weekly).
+  bottleneck** line (None / Current session / Weekly all-model / Weekly
+  model-specific, e.g. Sonnet).
 - **Current session pacing** — large "% left", live countdown, used-vs-expected
   mini bar with a linear pace marker, safe pace per hour, and "Unused if pace
   continues".
@@ -108,14 +109,10 @@ are fully isolated from claude.ai and vice-versa, and it lays out responsively u
 
 ## Privacy
 
-This extension runs entirely in your browser. It **does not** send usage data
-anywhere. It only reads the **visible usage text** from Claude's settings page and
-stores compact snapshots (percentages, reset labels, timestamps) locally via
-`chrome.storage.local`.
+Claude Usage Pace reads only visible usage percentages and reset labels from Claude's Usage settings page. It does not read Claude prompts, responses, or conversation content. It does not use a backend, analytics, or external network requests. Preferences and compact usage snapshots are stored locally in the browser.
 
-It never stores page HTML, your prompts or responses, or any account identifiers,
-and it makes **no external network calls** — there is no backend, no analytics, and
-no remote/hosted code.
+It never stores page HTML or account identifiers, and it makes **no external network
+calls** — there is no backend, no analytics, and no remote/hosted code.
 
 Permissions requested:
 
@@ -126,6 +123,8 @@ See [`store-assets/privacy-practices.md`](store-assets/privacy-practices.md) for
 full breakdown used in the Chrome Web Store listing.
 
 ## Limitations & assumptions
+
+Claude usage is variable. This extension does not estimate exact messages, tokens, or guaranteed remaining tasks. It provides percentage-based pacing guidance only.
 
 - **Usage is variable.** The extension never estimates exact "messages" or "tokens"
   left. All guidance is **percentage-based** — actual capacity depends on
@@ -144,11 +143,32 @@ full breakdown used in the Chrome Web Store listing.
   debug details** in Options to see exactly what was read.
 - Chrome / Chromium, Manifest V3.
 
-## Store submission assets
+## Chrome Web Store submission notes
 
-Drafts for the Chrome Web Store listing live in [`store-assets/`](store-assets/):
-`description.md`, `short-description.txt`, `privacy-practices.md`, `review-notes.md`,
-and `screenshot-plan.md`.
+Listing drafts live in [`store-assets/`](store-assets/):
+
+- [`short-description.txt`](store-assets/short-description.txt) — the one-line summary.
+- [`description.md`](store-assets/description.md) — the full listing description.
+- [`privacy-practices.md`](store-assets/privacy-practices.md) — the privacy disclosures
+  and per-permission justification used in the data-use form.
+- [`review-notes.md`](store-assets/review-notes.md) — reviewer instructions (how to test,
+  privacy, permissions, limitations).
+- [`screenshot-plan.md`](store-assets/screenshot-plan.md) — the five listing screenshots
+  and capture hygiene checklist.
+
+Before submitting:
+
+1. `npm run lint && npm run test && npm run build` — all must pass; the packaged
+   extension is the contents of `dist/`.
+2. Confirm `manifest.json` requests only `storage` and the `https://claude.ai/*` host
+   permission (no `tabs`, `activeTab`, `scripting`, broad hosts, or remote code).
+3. Capture screenshots per the plan, with parser debug mode **off** and no private
+   account/conversation data visible.
+
+## Not affiliated with Anthropic
+
+Claude Usage Pace is an independent tool and is **not affiliated with, endorsed by, or
+sponsored by Anthropic**. "Claude" is a trademark of Anthropic.
 
 ## License
 

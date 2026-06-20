@@ -248,7 +248,7 @@ export function OptionsPage() {
       </section>
 
       <div className="opt-saved">{savedNote}</div>
-      <div className="opt-foot">Claude Usage Pace · local-only · no tracking</div>
+      <div className="opt-foot">Claude Usage Pace · local-only · no tracking · not affiliated with Anthropic</div>
     </div>
   );
 }

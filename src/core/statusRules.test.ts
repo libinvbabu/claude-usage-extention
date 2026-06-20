@@ -25,7 +25,7 @@ describe("selectTopRecommendation", () => {
     expect(r.title).toBe("Usage data unavailable");
     expect(r.status).toBe("unknown");
     expect(r.bottleneck).toBe("none");
-    expect(r.bottleneckLabel).toBe("None");
+    expect(r.bottleneckLabel).toBe("Usage data unavailable");
     expect(r.guidanceMode).toBe("unavailable");
   });
 
@@ -42,8 +42,11 @@ describe("selectTopRecommendation", () => {
     expect(r.title).toBe("Good window for heavy work");
     expect(r.status).toBe("under_pace");
     expect(r.bottleneck).toBe("none");
+    expect(r.bottleneckLabel).toBe("None — session and weekly limits both have room");
     expect(r.guidanceMode).toBe("under_pace");
-    expect(r.body).toMatch(/under pace for both session and weekly limits/i);
+    expect(r.body).toMatch(/below target usage for both session and weekly limits/i);
+    // The user-facing copy must not leak the internal "under pace" jargon.
+    expect(r.body).not.toMatch(/under pace/i);
   });
 
   it("softens the body when the week is only on track", () => {
@@ -67,14 +70,23 @@ describe("selectTopRecommendation", () => {
     expect(r.guidanceMode).toBe("weekly_bottleneck");
   });
 
-  it("prefers the tighter weekly bucket as the bottleneck", () => {
+  it("prefers the tighter weekly bucket as the bottleneck and shows the parsed model", () => {
     const r = selectTopRecommendation([
       insight("current_session", "on_track"),
       insight("weekly_all_models", "at_risk", { remainingPct: 30 }),
-      insight("weekly_sonnet", "at_risk", { remainingPct: 8 }),
+      insight("weekly_sonnet", "at_risk", { remainingPct: 8, label: "Weekly · Sonnet" }),
     ]);
     expect(r.bottleneck).toBe("weekly_sonnet");
-    expect(r.bottleneckLabel).toBe("Sonnet weekly limit");
+    expect(r.bottleneckLabel).toBe("Weekly Sonnet limit");
+  });
+
+  it("falls back to a generic model-specific bottleneck when no model name is parsed", () => {
+    const r = selectTopRecommendation([
+      insight("current_session", "on_track"),
+      insight("weekly_sonnet", "at_risk", { remainingPct: 8, label: "Weekly limit" }),
+    ]);
+    expect(r.bottleneck).toBe("weekly_sonnet");
+    expect(r.bottleneckLabel).toBe("Weekly model-specific limit");
   });
 
   it("prioritises a session at risk over the week", () => {
@@ -103,6 +115,12 @@ describe("taskGuidanceFor", () => {
     const g = taskGuidanceFor("under_pace");
     expect(g?.items[0].heading).toBe("Good for");
     expect(g?.items).toHaveLength(2);
+  });
+
+  it("uses 'One focused Claude Code task' in the under-pace guidance", () => {
+    const g = taskGuidanceFor("under_pace");
+    expect(g?.items[0].body).toContain("One focused Claude Code task");
+    expect(g?.items[0].body).not.toContain("larger");
   });
 
   it("returns weekly-bottleneck guidance that saves usage", () => {

@@ -20,6 +20,11 @@
   --cup-text: rgba(255, 255, 255, 0.92);
   --cup-muted: rgba(255, 255, 255, 0.62);
   --cup-faint: rgba(255, 255, 255, 0.42);
+  /* Uppercase metric/section labels — a touch brighter than faint for legibility,
+     but deliberately not as bright as primary text. */
+  --cup-label: rgba(255, 255, 255, 0.58);
+  /* Linear-pace marker on progress bars — subtle but clearly visible. */
+  --cup-marker: rgba(255, 255, 255, 0.7);
   --cup-orange: #d97757;
   --cup-green: #6fbd9a;
   --cup-amber: #d8a657;
@@ -111,14 +116,14 @@
   border: 1px solid var(--cup-border);
   border-left: 3px solid var(--status-color, var(--cup-faint));
   border-radius: var(--cup-radius);
-  padding: 14px;
+  padding: 16px;
   margin-bottom: 16px;
 }
 .cup-rec-top {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 10px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
 }
 .cup-rec-title {
@@ -146,7 +151,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--cup-faint);
+  color: var(--cup-label);
 }
 .cup-rec-bottleneck-value {
   font-size: 13px;
@@ -180,13 +185,13 @@
   background: var(--cup-card);
   border: 1px solid var(--cup-border);
   border-radius: var(--cup-radius);
-  padding: 14px;
+  padding: 16px;
   margin-bottom: 16px;
 }
 .cup-weekly {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 16px;
 }
 .cup-weekly .cup-card {
@@ -249,8 +254,8 @@
   top: -2px;
   bottom: -2px;
   width: 2px;
-  background: var(--cup-text);
-  opacity: 0.6;
+  background: var(--cup-marker);
+  opacity: 1;
   border-radius: 2px;
 }
 
@@ -273,7 +278,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--cup-faint);
+  color: var(--cup-label);
 }
 .cup-metric-value {
   font-size: 14px;
@@ -354,7 +359,7 @@
   background: var(--cup-card);
   border: 1px solid var(--cup-border);
   border-radius: var(--cup-radius);
-  padding: 14px;
+  padding: 16px;
   margin-bottom: 16px;
   display: flex;
   flex-direction: column;
@@ -364,7 +369,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--cup-faint);
+  color: var(--cup-label);
   margin-bottom: 3px;
 }
 .cup-guidance-body {
@@ -387,7 +392,7 @@
   border: 1px solid var(--cup-border);
   border-left: 3px solid var(--cup-faint);
   border-radius: var(--cup-radius);
-  padding: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -411,7 +416,12 @@
   cursor: pointer;
 }
 .cup-btn:hover {
-  border-color: var(--cup-orange);
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+}
+.cup-btn:focus-visible {
+  outline: 2px solid var(--cup-green);
+  outline-offset: 2px;
 }
 .cup-btn-sm {
   padding: 4px 10px;
@@ -421,7 +431,7 @@
 /* Footer */
 .cup-footer {
   margin-top: 16px;
-  padding-top: 12px;
+  padding-top: 14px;
   border-top: 1px solid var(--cup-border);
   display: flex;
   flex-wrap: wrap;
@@ -466,8 +476,7 @@
   word-break: break-word;
 }
 
-/* Focus states */
-.cup-btn:focus-visible,
+/* Focus states (the Re-read .cup-btn carries its own green ring above) */
 .cup-iconbtn:focus-visible,
 .cup-tip-btn:focus-visible,
 .cup-debug summary:focus-visible {
@@ -495,7 +504,7 @@
 .cup.compact .cup-rec,
 .cup.compact .cup-card,
 .cup.compact .cup-guidance {
-  padding: 11px;
+  padding: 13px;
   margin-bottom: 12px;
 }
 .cup.compact .cup-weekly {
@@ -552,10 +561,16 @@
     --cup-text: rgba(0, 0, 0, 0.9);
     --cup-muted: rgba(0, 0, 0, 0.62);
     --cup-faint: rgba(0, 0, 0, 0.45);
+    --cup-label: rgba(0, 0, 0, 0.6);
+    --cup-marker: rgba(0, 0, 0, 0.55);
     --cup-track: rgba(0, 0, 0, 0.08);
   }
   .cup-tip-bubble {
     background: #ffffff;
     color: rgba(0, 0, 0, 0.9);
+  }
+  .cup-btn:hover {
+    border-color: rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.06);
   }
 }

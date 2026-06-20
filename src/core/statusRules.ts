@@ -33,11 +33,33 @@ export type TaskGuidance = { mode: GuidanceMode; items: TaskGuidanceItem[] };
 const HEALTHY: PaceStatus[] = ["under_pace", "on_track"];
 
 const BOTTLENECK_LABELS: Record<BottleneckType, string> = {
-  none: "None",
+  none: "None — session and weekly limits both have room",
   current_session: "Current session",
   weekly_all_models: "Weekly all-model limit",
-  weekly_sonnet: "Sonnet weekly limit",
+  // Generic fallback; the parsed model name (e.g. "Sonnet") is substituted when
+  // available — see labelForBottleneck().
+  weekly_sonnet: "Weekly model-specific limit",
 };
+
+/**
+ * Extract a model name from a weekly bucket label like "Weekly · Sonnet" → "Sonnet".
+ * Returns "" when no specific model can be read, so callers fall back to the
+ * generic "Weekly model-specific limit" wording rather than hardcoding Sonnet.
+ */
+function modelNameFromLabel(label: string | undefined): string {
+  if (!label || !label.includes("·")) return "";
+  const tail = label.split("·").pop()?.trim() ?? "";
+  return tail && !/^weekly$/i.test(tail) ? tail : "";
+}
+
+/** Bottleneck line for a chosen insight, substituting the model name when known. */
+function labelForBottleneck(insight: ClaudePaceInsight): string {
+  if (insight.type === "weekly_sonnet") {
+    const model = modelNameFromLabel(insight.label);
+    return model ? `Weekly ${model} limit` : BOTTLENECK_LABELS.weekly_sonnet;
+  }
+  return BOTTLENECK_LABELS[insight.type];
+}
 
 function byType(
   insights: ClaudePaceInsight[],
@@ -101,8 +123,16 @@ function rec(
   body: string,
   bottleneck: BottleneckType,
   guidanceMode: GuidanceMode,
+  bottleneckLabel?: string,
 ): TopRecommendation {
-  return { status, title, body, bottleneck, bottleneckLabel: BOTTLENECK_LABELS[bottleneck], guidanceMode };
+  return {
+    status,
+    title,
+    body,
+    bottleneck,
+    bottleneckLabel: bottleneckLabel ?? BOTTLENECK_LABELS[bottleneck],
+    guidanceMode,
+  };
 }
 
 /**
@@ -120,6 +150,7 @@ export function selectTopRecommendation(
       "Usage values couldn't be read from this page. Open Claude's Usage settings, or click Re-read once it finishes loading.",
       "none",
       "unavailable",
+      "Usage data unavailable",
     );
   }
 
@@ -154,6 +185,7 @@ export function selectTopRecommendation(
       "Your Sonnet weekly limit is used up. Switch models or wait for the weekly reset.",
       "weekly_sonnet",
       "weekly_bottleneck",
+      labelForBottleneck(sonnet),
     );
   }
 
@@ -177,6 +209,7 @@ export function selectTopRecommendation(
       "Your session still has room, but a weekly limit is filling faster than time is passing. It's the limit most likely to constrain heavy work.",
       weeklyAtRisk.type,
       "weekly_bottleneck",
+      labelForBottleneck(weeklyAtRisk),
     );
   }
 
@@ -200,6 +233,7 @@ export function selectTopRecommendation(
       "Your session has room, but weekly usage is a bit ahead of pace. The weekly limit is the more likely constraint this week.",
       weeklyAbove.type,
       "weekly_bottleneck",
+      labelForBottleneck(weeklyAbove),
     );
   }
 
@@ -212,8 +246,8 @@ export function selectTopRecommendation(
       (session?.status === "under_pace" || !session) &&
       (weekly?.status === "under_pace" || !weekly);
     const body = bothUnder
-      ? "You're under pace for both session and weekly limits. Large Claude Code tasks can still drain usage quickly, especially with long context."
-      : "You're under pace for this session and within pace for the week. Large Claude Code tasks can still drain usage quickly, especially with long context.";
+      ? "You're below target usage for both session and weekly limits. Large Claude Code tasks can still drain usage quickly, especially with long context."
+      : "You're below target usage for this session and within pace for the week. Large Claude Code tasks can still drain usage quickly, especially with long context.";
     return rec("under_pace", "Good window for heavy work", body, "none", "under_pace");
   }
 
@@ -231,7 +265,7 @@ export function selectTopRecommendation(
 // any claim of exact remaining messages or tokens.
 const GUIDANCE: Record<GuidanceMode, TaskGuidanceItem[]> = {
   under_pace: [
-    { heading: "Good for", body: "Small questions · Debugging · One larger Claude Code task" },
+    { heading: "Good for", body: "Small questions · Debugging · One focused Claude Code task" },
     { heading: "Before a large task", body: "Run /clear, then give a focused task brief." },
   ],
   on_track: [

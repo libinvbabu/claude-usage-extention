@@ -21,7 +21,7 @@ export type UsagePacePanelProps = {
   onReread?: () => void;
 };
 
-function Footer({
+export function Footer({
   lastReadAt,
   onReread,
 }: {
@@ -30,11 +30,18 @@ function Footer({
 }) {
   return (
     <footer className="cup-footer">
-      <div className="cup-footer-note">Based on Claude's visible usage bars. Local-only.</div>
+      <div className="cup-footer-note">
+        Based on Claude's visible usage bars. Local-only. No exact message/token estimates.
+      </div>
       <div className="cup-footer-actions">
         <span className="cup-footer-read">Last read from page: {formatLastRead(lastReadAt)}</span>
         {onReread ? (
-          <button type="button" className="cup-btn cup-btn-sm" onClick={onReread}>
+          <button
+            type="button"
+            className="cup-btn cup-btn-sm"
+            onClick={onReread}
+            aria-label="Re-read Claude usage from visible page"
+          >
             Re-read
           </button>
         ) : null}
@@ -51,7 +58,12 @@ function ErrorCard({ onReread }: { onReread?: () => void }) {
         after the page finishes loading.
       </p>
       {onReread ? (
-        <button type="button" className="cup-btn" onClick={onReread}>
+        <button
+          type="button"
+          className="cup-btn"
+          onClick={onReread}
+          aria-label="Re-read Claude usage from visible page"
+        >
           Re-read
         </button>
       ) : null}

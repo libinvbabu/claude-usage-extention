@@ -17,6 +17,11 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     sourcemap: false,
+    // The options page is a single self-contained bundle with no code-splitting,
+    // so no module preloads are needed. Dropping the polyfill removes the only
+    // fetch() reference from the shipped extension (it would only ever load local
+    // chunks, but a zero-network bundle is cleaner for store review).
+    modulePreload: false,
     rollupOptions: {
       input: {
         options: resolve(__dirname, "options.html"),

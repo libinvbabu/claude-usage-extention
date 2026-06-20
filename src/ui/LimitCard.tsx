@@ -1,11 +1,11 @@
 import type { ClaudePaceInsight } from "../types/usage";
 import {
-  formatClockTime,
-  formatDuration,
   formatPaceGap,
   formatPct,
+  formatPctInt,
   formatRatePerDay,
   formatRatePerHour,
+  formatSessionReset,
 } from "../core/formatters";
 import { MiniBar } from "./MiniBar";
 import { MetricGrid, type Metric } from "./MetricGrid";
@@ -36,14 +36,12 @@ export function LimitCard({ insight }: { insight: ClaudePaceInsight }) {
     });
   }
 
-  // Session shows the countdown plus the actual local reset time (the weekly
-  // cards already carry an absolute "Resets <Day> <time>" label).
-  const sessionClock =
-    isSession && insight.resetAt !== undefined ? formatClockTime(insight.resetAt) : "";
-  const resetText =
-    isSession && insight.remainingMs !== undefined
-      ? `Resets in ${formatDuration(insight.remainingMs)}${sessionClock ? ` · ${sessionClock}` : ""}`
-      : insight.resetLabel;
+  // Session shows the absolute reset time then the countdown ("Resets 6:29 PM ·
+  // in 3h 30m"), degrading gracefully when only one is known. Weekly cards keep
+  // Claude's own absolute "Resets <Day> <time>" label.
+  const resetText = isSession
+    ? formatSessionReset(insight.resetAt, insight.remainingMs) || insight.resetLabel
+    : insight.resetLabel;
 
   return (
     <div
@@ -52,10 +50,10 @@ export function LimitCard({ insight }: { insight: ClaudePaceInsight }) {
     >
       <div className="cup-card-head">
         <span className="cup-card-label">{insight.label}</span>
-        <span className="cup-card-used">{formatPct(insight.usedPct)} used</span>
+        <span className="cup-card-used">{formatPctInt(insight.usedPct)} used</span>
       </div>
       <div className="cup-card-headline">
-        <span className="cup-big">{formatPct(insight.remainingPct)}</span>
+        <span className="cup-big">{formatPctInt(insight.remainingPct)}</span>
         <span className="cup-reset">left · {resetText}</span>
       </div>
       <MiniBar usedPct={insight.usedPct} expectedPct={insight.expectedPct} status={insight.status} />

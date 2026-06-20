@@ -3,11 +3,21 @@
 
 import type { PaceStatus } from "../types/usage";
 
-/** "9%" / "12.5%" — drops the trailing ".0". */
+/** "9%" / "12.5%" — drops the trailing ".0". For rates/projections. */
 export function formatPct(n: number | undefined): string {
   if (n === undefined || !Number.isFinite(n)) return "—";
   const rounded = Math.round(n * 10) / 10;
   return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}%`;
+}
+
+/**
+ * Integer percentage for headline figures ("91% left", "9% used"), clamped to
+ * 0–100 so a stray reading can never render an out-of-range or non-finite value.
+ */
+export function formatPctInt(n: number | undefined): string {
+  if (n === undefined || !Number.isFinite(n)) return "—";
+  const clamped = Math.min(100, Math.max(0, n));
+  return `${Math.round(clamped)}%`;
 }
 
 /** "3h 31m" / "31m" / "2h" / "now". */
@@ -64,6 +74,31 @@ export function formatClockTime(
 }
 
 /**
+ * Session reset line combining the absolute clock time and the relative
+ * countdown, in that order: "Resets 6:29 PM · in 3h 30m". Degrades to whichever
+ * half is available ("Resets in 3h 30m" / "Resets 6:29 PM"), and returns "" when
+ * neither is — callers fall back to the raw label. Never produces "undefined",
+ * "NaN", awkward "in now" phrasing, or a dangling separator.
+ */
+export function formatSessionReset(
+  resetAt: number | undefined,
+  remainingMs: number | undefined,
+  now: number = Date.now(),
+): string {
+  const absolute = formatClockTime(resetAt, now); // "" when unknown
+  const relRaw =
+    remainingMs !== undefined && Number.isFinite(remainingMs) && remainingMs > 0
+      ? formatDuration(remainingMs)
+      : "";
+  const relative = relRaw === "now" ? "" : relRaw;
+
+  if (absolute && relative) return `Resets ${absolute} · in ${relative}`;
+  if (relative) return `Resets in ${relative}`;
+  if (absolute) return `Resets ${absolute}`;
+  return "";
+}
+
+/**
  * Signed pace gap as plain language.
  *  gap = used - expected.  Negative = under pace (good), positive = over.
  */
@@ -74,21 +109,24 @@ export function formatPaceGap(gap: number | undefined): string {
   return gap < 0 ? `${pts} pts under pace` : `${pts} pts over pace`;
 }
 
-/** Human label for a pace status, used on the status pill. */
+/**
+ * Human label for a pace status, used on the status pill. Deliberately avoids
+ * the internal "under_pace" jargon — users see "Has headroom" instead.
+ */
 export function statusLabel(status: PaceStatus): string {
   switch (status) {
     case "under_pace":
-      return "Under pace";
+      return "Has headroom";
     case "on_track":
       return "On track";
     case "slightly_above":
-      return "Slightly above";
+      return "Use carefully";
     case "at_risk":
       return "At risk";
     case "exhausted":
-      return "Exhausted";
+      return "Wait for reset";
     default:
-      return "Unknown";
+      return "Usage unavailable";
   }
 }
 
